@@ -2,11 +2,12 @@ import os
 import json
 import feedparser
 import requests
-from datetime import datetime
+import re
 import sys
 import socket
+from datetime import datetime, timedelta
 
-# --- CONFIGURATION ---
+# ================= CONFIG =================
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 NEWS_DATA_FILE = os.path.join(DATA_DIR, "design_data.json")
@@ -14,27 +15,34 @@ HISTORY_FILE = os.path.join(DATA_DIR, "history.txt")
 
 socket.setdefaulttimeout(15)
 
-# 🚨 THE VIP LIST
-PREMIUM_TEAMS = [
-    "india", "australia", "england", "pakistan", "south africa", "new zealand", 
-    "csk", "rcb", "mi", "kkr", "srh", "gt", "lsg", "rr", "pbks", "dc"
+# -------- TOP TEAMS (Whitelist) --------
+TOP_TEAMS = [
+    "india", "pakistan", "sri lanka", "bangladesh", "afghanistan",
+    "australia", "england", "new zealand", "south africa", "west indies",
+    "mumbai indians", "mi", "chennai super kings", "csk",
+    "royal challengers", "rcb", "kolkata knight riders", "kkr",
+    "sunrisers hyderabad", "srh", "delhi capitals", "dc",
+    "rajasthan royals", "rr", "lucknow super giants", "lsg",
+    "gujarat titans", "gt", "punjab kings", "pbks"
 ]
 
-# 🚨 ONLY THESE TRIGGER A POST
-VIRAL_KEYWORDS = [
-    "won", "lost", "win", "defeat", "tied", "draw", # Results
-    "century", "hat-trick", "record", "hero", "storm", # Achievements
-    "shock", "thriller", "drama", "controversy", # Viral
-    "final", "semi-final", "champion", "trophy" # Big Stakes
+# -------- FILTERS --------
+BLOCK_WORDS = [
+    "squad", "preview", "weather", "pitch report", "toss", "probable xi",
+    "fantasy", "injury update", "dream11", "practice", "training",
+    "press conference", "live score", "warm-up", "nets", "prediction",
+    "scenario", "points table"
 ]
 
-# 🗑️ IGNORE LIST (Boring Stuff)
-TRASH_KEYWORDS = [
-    "preview", "schedule", "squad", "announce", "weather", "toss", 
-    "playing xi", "live score", "warm-up", "training", "nets",
-    "prediction", "scenario", "table", "points", "stats"
+REJECT_WORDS = ["u19", "under-19", "women", "a team", "academy", "emerging"]
+
+IMPORTANT_WORDS = [
+    "win", "beat", "defeat", "thriller", "century",
+    "record", "final", "knockout", "eliminated",
+    "champion", "historic", "series", "title"
 ]
 
+# -------- RSS SOURCES --------
 RSS_FEEDS = [
     "https://www.espncricinfo.com/rss/content/story/feeds/0.xml",
     "https://sports.ndtv.com/rss/cricket",
@@ -42,69 +50,138 @@ RSS_FEEDS = [
     "https://timesofindia.indiatimes.com/rssfeeds/54829575.cms"
 ]
 
+
+# ================= HELPERS =================
+
+def normalize(text):
+    if not text:
+        return ""
+    return re.sub(r'[^a-z0-9]', '', text.lower().strip())
+
+
+def clean_summary(text):
+    if not text:
+        return ""
+    clean = re.sub(r'<[^<]+?>', '', text)
+    return clean.strip()
+
+
+def is_top_match(title):
+    t = title.lower()
+    if any(r in t for r in REJECT_WORDS):
+        return False
+    return any(team in t for team in TOP_TEAMS)
+
+
+def is_important(title):
+    t = title.lower()
+    return any(w in t for w in IMPORTANT_WORDS)
+
+
 def fetch_feed_safely(url):
-    headers = {"User-Agent": "Mozilla/5.0"}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
     try:
         response = requests.get(url, headers=headers, timeout=10)
         return feedparser.parse(response.content)
-    except: return None
+    except:
+        return None
 
-def is_viral_premium(text):
-    text = text.lower()
-    
-    # 1. TRASH FILTER (If it contains any trash word, ignore it immediately)
-    if any(x in text for x in TRASH_KEYWORDS):
-        return False
 
-    # 2. MUST BE A VIP TEAM
-    has_premium_team = any(team in text for team in PREMIUM_TEAMS)
-    if not has_premium_team: return False
-    
-    # 3. MUST CONTAIN A VIRAL TRIGGER
-    has_viral_keyword = any(word in text for word in VIRAL_KEYWORDS)
-    if not has_viral_keyword: return False
+def entry_time(e):
+    if hasattr(e, "published_parsed") and e.published_parsed:
+        return datetime(*e.published_parsed[:6])
+    return datetime.min
 
-    return True
+
+# ================= MAIN HUNTER =================
 
 def search_news_text():
     print("🦅 THE HUNTER: Scanning for BIG News Only...")
-    
-    if not os.path.exists(HISTORY_FILE): open(HISTORY_FILE, 'w').close()
-    with open(HISTORY_FILE, 'r') as f: posted_titles = f.read()
+
+    if not os.path.exists(HISTORY_FILE):
+        open(HISTORY_FILE, 'w').close()
+
+    with open(HISTORY_FILE, 'r') as f:
+        posted_set = set(normalize(line) for line in f.read().splitlines())
 
     for url in RSS_FEEDS:
-        print(f"   📡 Scanning: {url[:30]}...")
+        print(f"   📡 Scanning: {url[:40]}...")
         feed = fetch_feed_safely(url)
-        if not feed or not feed.entries: continue
-        
-        for entry in feed.entries[:10]:
-            title = entry.title
-            
-            if title[:20] in posted_titles: continue
+        if not feed or not feed.entries:
+            continue
 
-            # Strict Check
-            if not is_viral_premium(title):
-                # print(f"      🗑️ Ignored: {title[:30]}...")
+        entries = sorted(feed.entries, key=entry_time, reverse=True)
+
+        for entry in entries[:20]:
+            title = entry.title.strip()
+
+            # Reject empty/bad titles
+            if len(title) < 12:
                 continue
 
-            # ✅ FOUND VIRAL NEWS
+            norm_title = normalize(title)
+            norm_url = normalize(entry.link)
+
+            # Duplicate check (title + URL)
+            if norm_title in posted_set or norm_url in posted_set:
+                continue
+
+            # Require valid published time
+            if not hasattr(entry, "published_parsed") or not entry.published_parsed:
+                continue
+
+            pub_time = datetime(*entry.published_parsed[:6])
+            if datetime.now() - pub_time > timedelta(hours=18):
+                continue
+
+            # Trash filter
+            if any(word in title.lower() for word in BLOCK_WORDS):
+                continue
+
+            # Team whitelist
+            if not is_top_match(title):
+                continue
+
+            # Importance filter
+            if not is_important(title):
+                continue
+
+            # Clean summary
+            raw_summary = entry.get('summary') or entry.get('description') or ""
+            summary = clean_summary(raw_summary)
+            if len(summary) < 40:
+                summary = title
+
+            # ================= ACCEPT NEWS =================
             news_data = {
                 "title": title,
-                "summary": entry.get('summary', ''),
+                "summary": summary,
                 "url": entry.link,
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
-            
-            if not os.path.exists(DATA_DIR): os.makedirs(DATA_DIR)
-            with open(NEWS_DATA_FILE, 'w') as f: json.dump(news_data, f, indent=4)
-            with open(HISTORY_FILE, 'a') as f: f.write(title + "\n")
-                
-            print(f"✅ FOUND BIG NEWS: {news_data['title']}")
+
+            if not os.path.exists(DATA_DIR):
+                os.makedirs(DATA_DIR)
+
+            with open(NEWS_DATA_FILE, 'w') as f:
+                json.dump(news_data, f, indent=4)
+
+            with open(HISTORY_FILE, 'a') as f:
+                f.write(title + " | " + entry.link + "\n")
+
+            print(f"   ✔ ACCEPTED: {title[:70]}...")
             return True
 
-    print("❌ No VIRAL news found. Going to sleep.")
+    print("❌ No VIP news found.")
     return False
 
+
+# ================= ENTRY =================
+
 if __name__ == "__main__":
-    if search_news_text(): sys.exit(0)
-    else: sys.exit(1)
+    if search_news_text():
+        sys.exit(0)
+    else:
+        sys.exit(1)
