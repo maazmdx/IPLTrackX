@@ -1,8 +1,7 @@
 import os
 import json
-import re
 import requests
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont
 
 # --- CONFIGURATION ---
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -33,13 +32,24 @@ def download_fonts():
                 with open(font_path, 'wb') as f: f.write(r.content)
             except: pass
 
-def clean_text(text):
-    """Forcefully removes Markdown stars and clean up text."""
-    if not text: return ""
-    # Remove stars, underscores, and extra spaces
-    text = text.replace('*', '').replace('_', '').replace('#', '')
-    text = re.sub(r'\s+', ' ', text) # Collapse multiple spaces
-    return text.strip()
+def get_dynamic_font(text, max_width, max_height, font_path, draw):
+    """Calculates the best font size to fill the space."""
+    size = 120 # Start big
+    min_size = 40
+    
+    while size > min_size:
+        font = ImageFont.truetype(font_path, size)
+        lines = wrap_text(text, font, max_width, draw)
+        
+        text_h = len(lines) * (size * 1.2) # Estimate height
+        text_w = max([draw.textbbox((0,0), line, font=font)[2] for line in lines])
+        
+        if text_w <= max_width and text_h <= max_height:
+            return font, lines, size * 1.2
+        
+        size -= 5 # Reduce size and try again
+        
+    return ImageFont.truetype(font_path, min_size), wrap_text(text, font, max_width, draw), min_size * 1.2
 
 def wrap_text(text, font, max_width, draw):
     lines = []
@@ -48,7 +58,7 @@ def wrap_text(text, font, max_width, draw):
     for word in words[1:]:
         test_line = current_line + " " + word
         bbox = draw.textbbox((0, 0), test_line, font=font)
-        if bbox[2] - bbox[0] <= max_width:
+        if bbox[2] <= max_width:
             current_line = test_line
         else:
             lines.append(current_line)
@@ -57,7 +67,7 @@ def wrap_text(text, font, max_width, draw):
     return lines
 
 def create_design():
-    print("🎨 ARTIST: Starting 'Force-Fit' Render...")
+    print("🎨 ARTIST: Starting 'Master Layout' Render...")
     download_fonts()
 
     if not os.path.exists(NEWS_DATA): return False
@@ -65,104 +75,86 @@ def create_design():
 
     # CANVAS (Instagram Portrait)
     W, H = 1080, 1350
-    canvas = Image.new("RGB", (W, H), "black")
+    canvas = Image.new("RGB", (W, H), "#1a1a1a") # Dark gray fallback
 
-    # 1. IMAGE PROCESSING
+    # 1. IMAGE PROCESSING (Force-Fill Strategy)
     if os.path.exists(NEWS_IMAGE):
         try:
             img = Image.open(NEWS_IMAGE).convert("RGB")
             
-            # FORCE FILL LOGIC
-            # We want the image to cover the ENTIRE 1080x1350 canvas.
-            # Calculate ratios
+            # Calculate aspect ratios
             target_ratio = W / H
             img_ratio = img.width / img.height
 
             if img_ratio > target_ratio:
-                # Image is wider than canvas -> Resize by Height, Crop Width
+                # Image is wider -> Resize to height, crop width
                 new_height = H
                 new_width = int(new_height * img_ratio)
                 img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
                 
-                # Center Crop
+                # Center crop
                 left = (new_width - W) // 2
                 img = img.crop((left, 0, left + W, H))
             else:
-                # Image is taller/narrower -> Resize by Width, Crop Height
+                # Image is taller -> Resize to width, crop height
                 new_width = W
                 new_height = int(new_width / img_ratio)
                 img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
                 
-                # Center Crop (Focus slightly higher than center for faces)
-                top = (new_height - H) // 3 
+                # Bias crop towards the bottom (for action shots)
+                top = int((new_height - H) * 0.3) 
                 img = img.crop((0, top, W, top + H))
             
             canvas.paste(img, (0, 0))
 
         except Exception as e:
-            print(f"⚠️ Image Error: {e}. Using Black Background.")
-            # Keep black canvas
-    else:
-        print("⚠️ No Image Found. Using Black Background.")
+            print(f"⚠️ Image Error: {e}. Using solid background.")
 
-    # 2. OVERLAY (Dark Gradient at bottom for text readability)
+    # 2. DARK OVERLAY (For text readability)
     overlay = Image.new("RGBA", (W, H), (0,0,0,0))
     draw_overlay = ImageDraw.Draw(overlay)
-    
-    # Gradient from transparent to black (starting at 50% height)
-    for y in range(int(H * 0.4), H):
-        alpha = int(255 * ((y - H * 0.4) / (H * 0.6)) ** 1.5) # Non-linear for smoother fade
-        if alpha > 240: alpha = 240 # Max darkness
-        draw_overlay.line([(0, y), (W, y)], fill=(0, 0, 0, alpha))
-        
+    # Solid semi-transparent block at the bottom
+    draw_overlay.rectangle([(0, H - 500), (W, H)], fill=(0, 0, 0, 200))
     canvas.paste(overlay, (0,0), mask=overlay)
 
     # 3. TYPOGRAPHY
     draw = ImageDraw.Draw(canvas)
+    headline = data.get('title', '').upper()
     
-    try:
-        font_headline = ImageFont.truetype(FONT_BOLD, 90) # Big & Bold
-        font_badge = ImageFont.truetype(FONT_BOLD, 30)
-    except:
-        font_headline = ImageFont.load_default()
-        font_badge = ImageFont.load_default()
-
-    # Clean the text vigorously
-    headline = clean_text(data.get('title', '').upper())
-
-    # Padding
-    PAD_X = 60
-    PAD_BOTTOM = 80
-
-    # Wrap Headline
-    lines = wrap_text(headline, font_headline, W - (PAD_X * 2), draw)
+    # Layout Constants
+    PAD = 60
+    TEXT_AREA_W = W - (PAD * 2)
+    TEXT_AREA_H = 400
     
-    # Calculate Text Block Height to position it correctly
-    line_height = 100
-    total_text_height = len(lines) * line_height
-    
-    # Start position (Bottom up)
-    current_y = H - PAD_BOTTOM - total_text_height
-
-    # Badge (BREAKING NEWS)
-    badge_w = 260
-    badge_h = 45
-    draw.rounded_rectangle(
-        [(PAD_X, current_y - 70), (PAD_X + badge_w, current_y - 25)], 
-        radius=5, 
-        fill="#D10024" # Red
+    # Get Dynamic Headline Font
+    font_headline, hl_lines, hl_line_height = get_dynamic_font(
+        headline, TEXT_AREA_W, TEXT_AREA_H, FONT_BOLD, draw
     )
-    draw.text((PAD_X + 25, current_y - 62), "BREAKING NEWS", font=font_badge, fill="white")
+    
+    # Badge Font
+    try: font_badge = ImageFont.truetype(FONT_BOLD, 30)
+    except: font_badge = ImageFont.load_default()
 
+    # Position Elements (Bottom-Up)
+    current_y = H - PAD - 20
+    
     # Draw Headline
-    for line in lines:
-        draw.text((PAD_X, current_y), line, font=font_headline, fill="white")
-        current_y += line_height
+    for line in reversed(hl_lines):
+        draw.text((PAD, current_y - hl_line_height + 20), line, font=font_headline, fill="white")
+        current_y -= hl_line_height
 
-    # Watermark (Top Right)
-    draw.text((W - 250, 40), "@IPLTrackX", font=font_badge, fill=(255, 255, 255, 180))
+    # Draw Badge
+    current_y -= 70
+    draw.rounded_rectangle(
+        [(PAD, current_y), (PAD + 260, current_y + 45)], 
+        radius=6, fill="#D10024"
+    )
+    draw.text((PAD + 25, current_y + 8), "BREAKING NEWS", font=font_badge, fill="white")
 
-    canvas.save(FINAL_IMAGE, quality=100, subsampling=0)
+    # Watermark
+    draw.text((W - 250, 50), "@IPLTrackX", font=font_badge, fill=(255, 255, 255, 150))
+
+    canvas.save(FINAL_IMAGE, quality=95)
     print(f"✅ DESIGN COMPLETE: Saved to {FINAL_IMAGE}")
     return True
 
