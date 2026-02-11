@@ -6,87 +6,94 @@ import io
 from PIL import Image
 
 # --- CONFIGURATION ---
-# 🔴 PASTE YOUR SERPER KEY HERE 🔴
-SERPER_API_KEY = "49a2a86b4c1d082a0beb0d17ab10fc8dd6997cfa"
+SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "PASTE_YOUR_KEY_HERE_IF_LOCAL")
 
-# FIXED: Removed the typo 'l__file__' -> '__file__'
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 TEMP_DIR = os.path.join(BASE_DIR, "temp")
 NEWS_DATA = os.path.join(DATA_DIR, "design_data.json")
-NEWS_IMAGE = os.path.join(TEMP_DIR, "news_image.jpg")
 
-BAD_DOMAINS = ["instagram", "facebook", "twitter", "youtube", "tiktok", "vector", "freepik", "dreamstime", "alamy"]
+# We now support 2 images
+IMG_1 = os.path.join(TEMP_DIR, "news_image_1.jpg")
+IMG_2 = os.path.join(TEMP_DIR, "news_image_2.jpg")
 
-def download_image(url):
+BAD_DOMAINS = ["vector", "freepik", "dreamstime", "alamy", "stock", "getty", "icon"]
+
+def download_image(url, save_path):
     try:
-        resp = requests.get(url, timeout=10)
-        if resp.status_code == 200 and len(resp.content) > 30000: # Min 30KB
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200 and len(resp.content) > 30000:
             try:
-                img_test = Image.open(io.BytesIO(resp.content))
-                img_test.verify()
+                img = Image.open(io.BytesIO(resp.content))
+                img.verify()
+                with open(save_path, 'wb') as f: f.write(resp.content)
+                return True
             except: return False
-
-            with open(NEWS_IMAGE, 'wb') as f:
-                f.write(resp.content)
-            return True
-    except:
-        return False
+    except: return False
     return False
 
-def execute_search(query):
-    print(f"🔎 SERPER: Searching for -> '{query}'")
+def execute_search(query, num_results=5):
+    print(f"🔎 SERPER: Searching -> '{query}'")
     url = "https://google.serper.dev/images"
-    payload = json.dumps({"q": query, "gl": "in", "num": 10})
+    payload = json.dumps({"q": query, "gl": "in", "num": num_results})
     headers = {'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json'}
 
     try:
-        response = requests.post(url, headers=headers, data=payload)
-        results = response.json()
-        
-        if 'images' not in results: return False
-
-        for item in results['images']:
-            img_url = item.get('imageUrl')
-            if any(x in img_url.lower() for x in BAD_DOMAINS): continue
-            
-            print(f"   ⬇️ Downloading from {item.get('source')}...")
-            if download_image(img_url):
-                print(f"✅ SERPER SUCCESS: Secured valid image.")
-                return True
-        return False
-    except Exception as e:
-        print(f"⚠️ Search Error: {e}")
-        return False
+        resp = requests.post(url, headers=headers, data=payload).json()
+        return [item['imageUrl'] for item in resp.get('images', []) 
+                if not any(x in item['imageUrl'].lower() for x in BAD_DOMAINS)]
+    except: return []
 
 def search_visuals():
-    print("🔎 SERPER: Initializing High-Res Search...")
-    
-    if os.path.exists(NEWS_IMAGE): os.remove(NEWS_IMAGE)
-    if not os.path.exists(NEWS_DATA): return False
+    if os.path.exists(IMG_1): os.remove(IMG_1)
+    if os.path.exists(IMG_2): os.remove(IMG_2)
     
     with open(NEWS_DATA, 'r') as f: data = json.load(f)
+    title = data.get('title', '').lower()
     
-    base_query = data.get('visual_prompt', data['title'])
+    # STRATEGY: DUAL IMAGE DETECTION
+    # If "vs" or "beat" or "won" is in title, try to get 2 images
+    teams = []
     
-    # STRATEGY 1: ACTION SHOT
-    query_1 = f"{base_query} match action real photo high res -logo -vector"
-    if execute_search(query_1): return True
+    # Simple extraction logic (You can expand this list)
+    known_teams = ["india", "pakistan", "australia", "england", "rcb", "csk", "mi", "kkr", "srh", "gt", "lsg", "rr", "pbks", "dc"]
+    for t in known_teams:
+        if t in title: teams.append(t)
     
-    print("⚠️ Action shot not found. Switching to Backup Strategy...")
-
-    # STRATEGY 2: TEAM LOGO
-    team_name = " ".join(base_query.split()[:3]) 
-    query_2 = f"{team_name} cricket team official logo high res wallpaper"
-    if execute_search(query_2): return True
-
-    # STRATEGY 3: FLAG / GENERIC
-    query_3 = f"{team_name} cricket flag wallpaper"
-    if execute_search(query_3): return True
-
-    print("❌ All visual strategies failed.")
-    return False
+    # SCENARIO A: Two Teams Found (Split Screen)
+    if len(teams) >= 2:
+        print(f"⚔️ Dual-Mode Triggered: {teams[0]} vs {teams[1]}")
+        
+        # Image 1 (Team A)
+        urls_1 = execute_search(f"{teams[0]} cricket captain match action real photo")
+        for url in urls_1:
+            if download_image(url, IMG_1): break
+            
+        # Image 2 (Team B)
+        urls_2 = execute_search(f"{teams[1]} cricket captain match action real photo")
+        for url in urls_2:
+            if download_image(url, IMG_2): break
+            
+    # SCENARIO B: Single Topic (Hero Image)
+    else:
+        print("👤 Single-Mode Triggered")
+        query = data.get('visual_prompt', title) + " real photo high res"
+        urls = execute_search(query, 10)
+        
+        # Try to download at least one good one
+        for url in urls:
+            if download_image(url, IMG_1): 
+                print("✅ Image 1 Secured.")
+                break
+        
+        # Optional: Try to get a second contextual image (Stadium/Crowd) just in case
+        if os.path.exists(IMG_1):
+            urls_bg = execute_search(query + " stadium atmosphere wide shot")
+            for url in urls_bg:
+                # Ensure we don't download the exact same image
+                if url != urls[0]: 
+                    if download_image(url, IMG_2): break
 
 if __name__ == "__main__":
-    if search_visuals(): sys.exit(0)
-    else: sys.exit(1)
+    search_visuals()
+    sys.exit(0)

@@ -1,7 +1,8 @@
 import os
 import json
+import textwrap
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 # --- CONFIGURATION ---
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -11,151 +12,149 @@ ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 FONTS_DIR = os.path.join(ASSETS_DIR, "fonts")
 
 NEWS_DATA = os.path.join(DATA_DIR, "design_data.json")
-NEWS_IMAGE = os.path.join(TEMP_DIR, "news_image.jpg")
+IMG_1 = os.path.join(TEMP_DIR, "news_image_1.jpg")
+IMG_2 = os.path.join(TEMP_DIR, "news_image_2.jpg")
 FINAL_IMAGE = os.path.join(BASE_DIR, "final_post.jpg")
 
-# Font Paths
-FONT_BOLD = os.path.join(FONTS_DIR, "Anton-Regular.ttf") 
-FONT_REGULAR = os.path.join(FONTS_DIR, "Roboto-Regular.ttf")
+FONT_BOLD = os.path.join(FONTS_DIR, "Anton-Regular.ttf")
 
 def download_fonts():
     if not os.path.exists(FONTS_DIR): os.makedirs(FONTS_DIR)
-    fonts = {
-        "Anton-Regular.ttf": "https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf",
-        "Roboto-Regular.ttf": "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Regular.ttf"
-    }
-    for font_name, url in fonts.items():
-        font_path = os.path.join(FONTS_DIR, font_name)
-        if not os.path.exists(font_path):
-            try:
-                r = requests.get(url)
-                with open(font_path, 'wb') as f: f.write(r.content)
-            except: pass
+    if not os.path.exists(FONT_BOLD):
+        r = requests.get("https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf")
+        with open(FONT_BOLD, 'wb') as f: f.write(r.content)
 
-def get_dynamic_font(text, max_width, max_height, font_path, draw):
-    """Calculates the best font size to fill the space."""
-    size = 120 # Start big
-    min_size = 40
-    
-    while size > min_size:
-        font = ImageFont.truetype(font_path, size)
-        lines = wrap_text(text, font, max_width, draw)
-        
-        text_h = len(lines) * (size * 1.2) # Estimate height
-        text_w = max([draw.textbbox((0,0), line, font=font)[2] for line in lines])
-        
-        if text_w <= max_width and text_h <= max_height:
-            return font, lines, size * 1.2
-        
-        size -= 5 # Reduce size and try again
-        
-    return ImageFont.truetype(font_path, min_size), wrap_text(text, font, max_width, draw), min_size * 1.2
-
-def wrap_text(text, font, max_width, draw):
-    lines = []
-    words = text.split()
-    current_line = words[0]
-    for word in words[1:]:
-        test_line = current_line + " " + word
-        bbox = draw.textbbox((0, 0), test_line, font=font)
-        if bbox[2] <= max_width:
-            current_line = test_line
-        else:
-            lines.append(current_line)
-            current_line = word
-    lines.append(current_line)
-    return lines
+def crop_center(pil_img, crop_width, crop_height):
+    img_width, img_height = pil_img.size
+    return pil_img.resize((crop_width, crop_height), Image.Resampling.LANCZOS)
 
 def create_design():
-    print("🎨 ARTIST: Starting 'Master Layout' Render...")
+    print("🎨 ARTIST: Starting Dynamic Render...")
     download_fonts()
-
-    if not os.path.exists(NEWS_DATA): return False
-    with open(NEWS_DATA, 'r') as f: data = json.load(f)
-
-    # CANVAS (Instagram Portrait)
+    
+    # 1. Canvas Setup
     W, H = 1080, 1350
-    canvas = Image.new("RGB", (W, H), "#1a1a1a") # Dark gray fallback
-
-    # 1. IMAGE PROCESSING (Force-Fill Strategy)
-    if os.path.exists(NEWS_IMAGE):
-        try:
-            img = Image.open(NEWS_IMAGE).convert("RGB")
-            
-            # Calculate aspect ratios
-            target_ratio = W / H
-            img_ratio = img.width / img.height
-
-            if img_ratio > target_ratio:
-                # Image is wider -> Resize to height, crop width
-                new_height = H
-                new_width = int(new_height * img_ratio)
-                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                
-                # Center crop
-                left = (new_width - W) // 2
-                img = img.crop((left, 0, left + W, H))
-            else:
-                # Image is taller -> Resize to width, crop height
-                new_width = W
-                new_height = int(new_width / img_ratio)
-                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                
-                # Bias crop towards the bottom (for action shots)
-                top = int((new_height - H) * 0.3) 
-                img = img.crop((0, top, W, top + H))
-            
-            canvas.paste(img, (0, 0))
-
-        except Exception as e:
-            print(f"⚠️ Image Error: {e}. Using solid background.")
-
-    # 2. DARK OVERLAY (For text readability)
+    canvas = Image.new("RGB", (W, H), "#111111")
+    
+    # 2. Image Logic (The Splitter)
+    has_img1 = os.path.exists(IMG_1)
+    has_img2 = os.path.exists(IMG_2)
+    
+    if has_img1 and has_img2:
+        print("   🖼️ Dual Image Layout")
+        # Split Top/Bottom
+        i1 = Image.open(IMG_1).convert("RGB")
+        i2 = Image.open(IMG_2).convert("RGB")
+        
+        # Top Half (0 to 675)
+        canvas.paste(crop_center(i1, W, H//2), (0, 0))
+        # Bottom Half (675 to 1350)
+        canvas.paste(crop_center(i2, W, H//2), (0, H//2))
+        
+        # Add a "VS" divider line
+        draw = ImageDraw.Draw(canvas)
+        draw.line([(0, H//2), (W, H//2)], fill="white", width=10)
+        
+    elif has_img1:
+        print("   🖼️ Single Hero Layout")
+        # Full Screen
+        i1 = Image.open(IMG_1).convert("RGB")
+        
+        # Smart Resize (Fill Height)
+        ratio = H / i1.height
+        new_w = int(i1.width * ratio)
+        if new_w < W: ratio = W / i1.width # Fallback if width is too small
+        
+        final_size = (int(i1.width * ratio), int(i1.height * ratio))
+        i1 = i1.resize(final_size, Image.Resampling.LANCZOS)
+        
+        # Center Crop
+        left = (i1.width - W) // 2
+        canvas.paste(i1.crop((left, 0, left + W, H)), (0, 0))
+        
+    else:
+        print("   ⚠️ No Images. Using Text-Only Mode.")
+        
+    # 3. The Shadow (Readability Layer)
+    # Heavier gradient at bottom for text
     overlay = Image.new("RGBA", (W, H), (0,0,0,0))
-    draw_overlay = ImageDraw.Draw(overlay)
-    # Solid semi-transparent block at the bottom
-    draw_overlay.rectangle([(0, H - 500), (W, H)], fill=(0, 0, 0, 200))
+    d_over = ImageDraw.Draw(overlay)
+    
+    # Gradient starts at 40% height
+    for y in range(int(H * 0.4), H):
+        alpha = int(255 * ((y - H * 0.4) / (H * 0.6)) ** 2)
+        d_over.line([(0, y), (W, y)], fill=(0, 0, 0, alpha))
+        
     canvas.paste(overlay, (0,0), mask=overlay)
-
-    # 3. TYPOGRAPHY
+    
+    # 4. Elastic Text Engine
     draw = ImageDraw.Draw(canvas)
-    headline = data.get('title', '').upper()
     
-    # Layout Constants
-    PAD = 60
-    TEXT_AREA_W = W - (PAD * 2)
-    TEXT_AREA_H = 400
+    with open(NEWS_DATA, 'r') as f: data = json.load(f)
+    text = data.get('title', "BREAKING NEWS").upper().replace('*', '')
     
-    # Get Dynamic Headline Font
-    font_headline, hl_lines, hl_line_height = get_dynamic_font(
-        headline, TEXT_AREA_W, TEXT_AREA_H, FONT_BOLD, draw
-    )
+    # Constraints
+    MAX_W = W - 100 # 50px padding on sides
+    MAX_H = 500     # Max height for text block
+    START_Y = H - 100 # Bottom anchor
     
-    # Badge Font
-    try: font_badge = ImageFont.truetype(FONT_BOLD, 30)
-    except: font_badge = ImageFont.load_default()
+    font_size = 110 # Start Huge
+    min_font_size = 45
+    final_font = None
+    final_lines = []
+    
+    # Binary Shrink Loop
+    while font_size >= min_font_size:
+        try:
+            font = ImageFont.truetype(FONT_BOLD, font_size)
+        except:
+            font = ImageFont.load_default()
+            break
+            
+        # Wrap text based on average char width
+        avg_char_w = font_size * 0.5
+        chars_per_line = int(MAX_W / avg_char_w)
+        lines = textwrap.wrap(text, width=chars_per_line)
+        
+        # Calculate Height
+        line_height = font_size * 1.1
+        total_h = len(lines) * line_height
+        
+        # Check if it fits
+        if total_h <= MAX_H:
+            final_font = font
+            final_lines = lines
+            break
+            
+        font_size -= 5 # Shrink and retry
+        
+    # If text is STILL too long after shrinking to 45px, truncate it
+    if font_size < min_font_size:
+        font = ImageFont.truetype(FONT_BOLD, min_font_size)
+        lines = textwrap.wrap(text, width=40)
+        final_lines = lines[:5] # Keep first 5 lines
+        final_lines[-1] += "..." # Add ellipsis
+        final_font = font
 
-    # Position Elements (Bottom-Up)
-    current_y = H - PAD - 20
+    # 5. Render Text
+    current_y = START_Y - (len(final_lines) * (font_size * 1.1))
     
-    # Draw Headline
-    for line in reversed(hl_lines):
-        draw.text((PAD, current_y - hl_line_height + 20), line, font=font_headline, fill="white")
-        current_y -= hl_line_height
-
-    # Draw Badge
-    current_y -= 70
+    # Badge
     draw.rounded_rectangle(
-        [(PAD, current_y), (PAD + 260, current_y + 45)], 
-        radius=6, fill="#D10024"
+        [(50, current_y - 70), (320, current_y - 15)], 
+        radius=8, fill="#D10024"
     )
-    draw.text((PAD + 25, current_y + 8), "BREAKING NEWS", font=font_badge, fill="white")
-
+    draw.text((75, current_y - 62), "BREAKING NEWS", font=ImageFont.truetype(FONT_BOLD, 30), fill="white")
+    
+    for line in final_lines:
+        draw.text((50, current_y), line, font=final_font, fill="white")
+        current_y += (font_size * 1.1)
+        
     # Watermark
-    draw.text((W - 250, 50), "@IPLTrackX", font=font_badge, fill=(255, 255, 255, 150))
-
-    canvas.save(FINAL_IMAGE, quality=95)
-    print(f"✅ DESIGN COMPLETE: Saved to {FINAL_IMAGE}")
+    draw.text((W - 250, 50), "@IPLTrackX", font=ImageFont.truetype(FONT_BOLD, 30), fill=(255, 255, 255, 128))
+    
+    canvas.save(FINAL_IMAGE, quality=100)
+    print("✅ Dynamic Layout Rendered.")
     return True
 
 if __name__ == "__main__":
