@@ -2,8 +2,8 @@ name: IPLTrackX Auto-Bot
 
 on:
   schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+    - cron: '0 * * * *'   # Every hour
+  workflow_dispatch:      # Manual trigger allowed
 
 jobs:
   run-bot:
@@ -12,38 +12,59 @@ jobs:
 
     steps:
 
-      - uses: actions/checkout@v4
+      # ---------------- CHECKOUT ----------------
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      # ---------------- PYTHON ----------------
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
-      - run: pip install -r requirements.txt
+      # ---------------- INSTALL ----------------
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
 
+      # ---------------- AUTH FILES ----------------
       - name: Create Auth Files
         env:
           TOKEN_DATA: ${{ secrets.TOKEN_JSON }}
           CRED_DATA: ${{ secrets.CREDENTIALS_JSON }}
         run: |
           import os
-          if os.environ.get("TOKEN_DATA"):
-              open("token.json","w").write(os.environ["TOKEN_DATA"])
-          if os.environ.get("CRED_DATA"):
-              open("credentials.json","w").write(os.environ["CRED_DATA"])
+
+          token = os.environ.get("TOKEN_DATA")
+          cred = os.environ.get("CRED_DATA")
+
+          if token:
+              open("token.json", "w").write(token)
+              print("token.json created")
+          else:
+              print("TOKEN_JSON missing")
+
+          if cred:
+              open("credentials.json", "w").write(cred)
+              print("credentials.json created")
+          else:
+              print("CREDENTIALS_JSON missing")
         shell: python
 
-      - name: Run Pipeline
+      # ---------------- RUN BOT ----------------
+      - name: Run IPLTrackX
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
         run: python control/main.py
 
-      - name: Save History
+      # ---------------- SAVE HISTORY ----------------
+      - name: Update History
         run: |
           git config --global user.name "IPLBot"
           git config --global user.email "bot@ipltrackx.com"
+
           git add data/history.txt || true
-          git commit -m "Update History [skip ci]" || echo "No change"
+          git commit -m "Update history [skip ci]" || echo "No change"
           git push || echo "Nothing to push"
 
