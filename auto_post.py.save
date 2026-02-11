@@ -1,0 +1,146 @@
+import json
+import requests
+from google import genai
+from PIL import Image, ImageDraw, ImageFont
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+
+# ---------- FETCH MATCH DATA ----------
+url = "https://site.web.api.espn.com/apis/v2/sports/cricket/scoreboard"
+
+try:
+    r = requests.get(url, timeout=10)
+    data = r.json()
+except:
+    data = {}
+
+matches = data.get("events", [])
+
+ipl_matches = []
+
+for m in matches:
+    name = m.get("name", "").lower()
+    comp = m.get("season", {}).get("slug", "").lower()
+
+    # IPL detection (safe)
+    if "ipl" in name or "indian premier league" in name or "ipl" in comp:
+        ipl_matches.append(m)
+
+# Fallback if no IPL match found
+if not ipl_matches:
+    match_name = "IPL Update"
+    status = "No IPL match currently"
+else:
+    match = ipl_matches[0]
+    match_name = match.get("name", "IPL Match")
+    status = match.get("status", {}).get("type", {}).get("description", "Unknown")
+
+# Safe fallback if no match
+if not matches:
+    match_name = "IPL Update"
+    status = "No live match currently"
+else:
+    match = matches[0]
+    match_name = match.get("name", "Unknown Match")
+    status = match.get("status", {}).get("type", {}).get("description", "Unknown")
+
+# ---------- DUPLICATE CHECK ----------
+try:
+    with open("data/posted_log.json", "r") as f:
+        log = json.load(f)
+except:
+    log = {}
+
+if log.get("last_match") == match_name:
+    print("No new update. Skipping post.")
+    exit()
+
+# ---------- AI CONTENT ----------
+API_KEY = "AIzaSyAr0HC-K_d5Au3tLKw4O5FY8xcYKiHLGcQ"
+client = genai.Client(api_key=API_KEY)
+
+prompt = f"""
+You are generating content for IPLTrackX sports media page.
+
+Match: {match_name}
+Status: {status}
+
+Generate structured output:
+
+1. MATCH RESULT (short headline)
+2. PLAYER OF THE MATCH
+3. TOP BATTER
+4. TOP BOWLER
+5. SHORT MATCH SUMMARY
+
+Keep it professional, short, sports-media style.
+"""
+
+
+response = client.models.generate_content(
+    model="gemini-2.0-flash",
+    contents=prompt
+)
+
+ai_text = response.text if response.text else "IPL latest update."
+
+
+# ---------- IMAGE GENERATION ----------
+img = Image.new("RGB", (1080, 1080), (20, 20, 20))
+draw = ImageDraw.Draw(img)
+font = ImageFont.truetype("fonts/LeagueSpartan-Bold.ttf", 50)
+
+draw.text((80, 200), "IPLTrackX", font=font, fill=(255, 255, 255))
+draw.text((80, 350), match_name, font=font, fill=(255, 200, 0))
+draw.text((80, 450), status, font=font, fill=(200, 200, 200))
+draw.text((80, 550), ai_text[:180], font=font, fill=(180, 180, 180))
+
+image_path = "output/auto_post.png"
+img.save(image_path)
+
+# ---------- DRIVE UPLOAD ----------
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+import os
+from google.oauth2.credentials import Credentials
+
+TOKEN_FILE = "data/token.json"
+
+creds = None
+
+if os.path.exists(TOKEN_FILE):
+    creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+
+if not creds or not creds.valid:
+    flow = InstalledAppFlow.from_client_secrets_file('data/oauth.json', SCOPES)
+    creds = flow.run_local_server(port=0)
+
+    with open(TOKEN_FILE, "w") as token:
+        token.write(creds.to_json())
+
+drive_service = build('drive', 'v3', credentials=creds)
+
+FOLDER_ID = "130zHH0Khnlbz6ki3F3b_NQTjMy64s8cF"
+
+file_metadata = {
+    'name': 'auto_post.png',
+    'parents': [FOLDER_ID]
+}
+
+media = MediaFileUpload(image_path, mimetype='image/png')
+
+file = drive_service.files().create(
+    body=file_metadata,
+    media_body=media,
+    fields='id'
+).execute()
+
+print("Uploaded:", file.get("id"))
+
+# ---------- UPDATE LOG ----------
+log["last_match"] = match_name
+with open("data/posted_log.json", "w") as f:
+    json.dump(log, f, indent=2)
+
+print("Automation completed successfully.")
+

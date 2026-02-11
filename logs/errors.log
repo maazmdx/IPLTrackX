@@ -1,0 +1,94 @@
+[2026-02-10 12:48:39] ERROR: [QC] Code: E07 - Quality Check Failed after retries. Skipping Post.
+[2026-02-10 13:14:40] ERROR: [ContextProc] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-10 13:14:44] ERROR: [ContextProc] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-10 13:14:47] ERROR: [ContextProc] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-10 13:14:49] ERROR: [ContextProc] Code: E99 - CRITICAL FAILURE. Skipping Step.
+[2026-02-10 14:26:11] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-10 14:27:26] ERROR: [Publisher] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-10 14:29:44] ERROR: [Publisher] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-10 14:29:46] ERROR: [Publisher] Code: E99 - CRITICAL FAILURE. Skipping Step.
+[2026-02-10 14:29:46] ERROR: [Publisher] Code: E08 - Upload Failed.
+[2026-02-10 14:33:45] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-10 14:36:05] ERROR: [Publisher] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-10 14:37:24] ERROR: [Publisher] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-10 14:43:50] ERROR: [GoogleSearch] Code: CRITICAL - Search Failed. Stopping cycle to prevent bad data.
+[2026-02-10 14:51:19] ERROR: [GoogleSearch] Code: CRITICAL - Search Failed. Stopping cycle to prevent bad data.
+[2026-02-10 14:53:11] ERROR: [GoogleSearch] Code: CRITICAL - Search Failed. Stopping cycle to prevent bad data.
+[2026-02-10 15:04:40] ERROR: [Hunter(Text)] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-10 15:05:04] ERROR: [Hunter(Image)] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-10 15:05:12] ERROR: [Hunter(Image)] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-10 15:05:19] ERROR: [Hunter(Image)] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-10 15:05:21] ERROR: [Hunter(Image)] Code: E99 - CRITICAL FAILURE. Skipping Step.
+[2026-02-10 15:05:21] ERROR: [Hunter] Code: E02 - No images found.
+[2026-02-10 15:18:02] ERROR: [Hunter(Text)] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-10 15:18:14] ERROR: [Hunter(Text)] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-10 15:18:26] ERROR: [Hunter(Text)] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-10 15:18:28] ERROR: [Hunter(Text)] Code: E99 - CRITICAL FAILURE. Skipping Step.
+[2026-02-10 15:18:28] ERROR: [Hunter] Code: E01 - No news found. Sleeping.
+[2026-02-11 00:43:26] ERROR: [Hunter(Text)] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 00:43:34] ERROR: [Hunter(Text)] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 01:28:09] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 01:31:20] ERROR: [Publisher] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 01:43:09] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 01:55:30] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:00:03] ERROR: [Artist] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:00:05] ERROR: [Artist] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 02:00:07] ERROR: [Artist] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-11 02:00:09] ERROR: [Artist] Code: E99 - CRITICAL FAILURE. Skipping Step.
+[2026-02-11 02:02:04] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:02:04] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:02:05] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:02:06] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:02:07] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:10:01] ERROR: [Hunter(Text)] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:10:01] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:10:01] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:10:02] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:10:02] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:10:02] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:10:03] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:11:39] ERROR: [Critic] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:16:55] ERROR: [Hunter(Text)] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:17:05] ERROR: [Hunter(Text)] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 02:17:20] ERROR: [Hunter(Text)] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-11 02:17:22] ERROR: [Hunter(Text)] Code: E99 - CRITICAL FAILURE. Skipping Step.
+[2026-02-11 02:17:22] ERROR: [Hunter] Code: E01 - No news found. Sleeping.
+[2026-02-11 02:18:01] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:18:02] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:18:02] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:20:02] ERROR: [Hunter(Text)] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:20:13] ERROR: [Hunter(Text)] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 02:20:23] ERROR: [Hunter(Text)] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-11 02:21:04] ERROR: [Hunter(Text)] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:21:16] ERROR: [Hunter(Text)] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 02:21:28] ERROR: [Hunter(Text)] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-11 02:21:30] ERROR: [Hunter(Text)] Code: E99 - CRITICAL FAILURE. Skipping Step.
+[2026-02-11 02:21:30] ERROR: [Hunter] Code: E01 - No news found. Sleeping.
+[2026-02-11 02:26:35] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:27:16] ERROR: [Publisher] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 02:34:13] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:35:38] ERROR: [Publisher] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 02:37:03] ERROR: [Publisher] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-11 02:39:14] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 02:39:16] ERROR: [Publisher] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 02:39:19] ERROR: [Publisher] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-11 02:39:21] ERROR: [Publisher] Code: E99 - CRITICAL FAILURE. Skipping Step.
+[2026-02-11 03:00:27] ERROR: [Hunter(Text)] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 03:00:35] ERROR: [Hunter(Text)] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 03:00:44] ERROR: [Hunter(Text)] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-11 03:00:46] ERROR: [Hunter(Text)] Code: E99 - CRITICAL FAILURE. Skipping Step.
+[2026-02-11 03:00:46] ERROR: [Hunter] Code: E01 - No news found. Sleeping.
+[2026-02-11 03:01:22] ERROR: [Hunter(Text)] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 03:01:31] ERROR: [Hunter(Text)] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 03:01:40] ERROR: [Hunter(Text)] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-11 03:01:42] ERROR: [Hunter(Text)] Code: E99 - CRITICAL FAILURE. Skipping Step.
+[2026-02-11 03:01:42] ERROR: [Hunter] Code: E01 - No news found. Sleeping.
+[2026-02-11 12:13:47] ERROR: [Hunter(Text)] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 12:13:49] ERROR: [Hunter(Text)] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 12:13:51] ERROR: [Hunter(Text)] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-11 12:13:53] ERROR: [Hunter(Text)] Code: E99 - CRITICAL FAILURE. Skipping Step.
+[2026-02-11 12:13:53] ERROR: [Hunter] Code: E01 - No news found. Sleeping.
+[2026-02-11 13:22:27] ERROR: [Publisher] Code: E99 - Attempt 1/3 Failed: Agent returned False status
+[2026-02-11 13:22:59] ERROR: [Publisher] Code: E99 - Attempt 2/3 Failed: Agent returned False status
+[2026-02-11 13:23:32] ERROR: [Publisher] Code: E99 - Attempt 3/3 Failed: Agent returned False status
+[2026-02-11 13:23:34] ERROR: [Publisher] Code: E99 - CRITICAL FAILURE. Skipping Step.

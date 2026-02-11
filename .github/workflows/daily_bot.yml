@@ -1,0 +1,46 @@
+name: IPLTrackX Auto-Bot
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Runs every hour (at minute 0)
+  workflow_dispatch:      # Allows you to click "Run Now" manually for testing
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Create Auth Files (Inject Secrets)
+        # This takes your Keys from GitHub Secrets and creates the files needed
+        run: |
+          echo '${{ secrets.TOKEN_JSON }}' > token.json
+          echo '${{ secrets.CREDENTIALS_JSON }}' > credentials.json
+
+      - name: Run The Bot
+        env:
+          # We pass the keys as Environment Variables
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+        run: |
+          python control/main.py
+
+      - name: Keep History Alive (Commit Changes)
+        # This saves the history.txt so the bot remembers what it posted
+        run: |
+          git config --global user.name "IPLBot"
+          git config --global user.email "bot@ipltrackx.com"
+          git add data/history.txt
+          git commit -m "📝 Update History [skip ci]" || echo "No changes to commit"
+          git push

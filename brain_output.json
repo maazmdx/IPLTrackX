@@ -1,0 +1,16 @@
+{
+  "post_type": "fallback",
+  "template": "card",
+  "mood": "moody",
+  "background_style": "neutral_dark",
+  "color_logic": "neutral",
+  "typography": "balanced",
+  "density": "medium",
+  "headline": "IPL Update",
+  "sub_headline": "No match currently",
+  "facts": [
+    "IPL update",
+    "More info soon",
+    "Stay tuned"
+  ]
+}
