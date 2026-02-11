@@ -18,6 +18,45 @@ FONT_BOLD = os.path.join(FONTS_DIR, "Anton-Regular.ttf")
 FONT_REGULAR = os.path.join(FONTS_DIR, "Roboto-Regular.ttf")
 
 
+# ================= FONT SAFETY =================
+
+def ensure_fonts():
+    os.makedirs(FONTS_DIR, exist_ok=True)
+
+    fonts = {
+        "Anton-Regular.ttf":
+        "https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf",
+
+        "Roboto-Regular.ttf":
+        "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Regular.ttf"
+    }
+
+    for name, url in fonts.items():
+        path = os.path.join(FONTS_DIR, name)
+
+        if os.path.exists(path) and os.path.getsize(path) > 20000:
+            continue
+
+        print(f"⬇️ Downloading font: {name}")
+        try:
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200 and len(r.content) > 20000:
+                with open(path, "wb") as f:
+                    f.write(r.content)
+        except:
+            print(f"⚠️ Failed to download {name}")
+
+
+def safe_font(path, size):
+    try:
+        if not os.path.exists(path) or os.path.getsize(path) < 10000:
+            raise Exception("Font missing/corrupt")
+        return ImageFont.truetype(path, size)
+    except:
+        print(f"⚠️ Using default font for {path}")
+        return ImageFont.load_default()
+
+
 # ================= HELPERS =================
 
 def calculate_brightness(image):
@@ -41,12 +80,13 @@ def wrap_text(draw, text, font, max_width):
 
     if current:
         lines.append(current)
+
     return lines
 
 
-def draw_shadow(draw, pos, text, font, fill, shadow=(0, 0, 0), offset=3):
+def draw_shadow(draw, pos, text, font, fill, offset=3):
     x, y = pos
-    draw.text((x + offset, y + offset), text, font=font, fill=shadow)
+    draw.text((x + offset, y + offset), text, font=font, fill=(0, 0, 0))
     draw.text((x, y), text, font=font, fill=fill)
 
 
@@ -55,6 +95,7 @@ def draw_shadow(draw, pos, text, font, fill, shadow=(0, 0, 0), offset=3):
 def create_design():
 
     print("🎨 ARTIST: Rendering broadcast post...")
+    ensure_fonts()
 
     W, H = 1080, 1350
     canvas = Image.new("RGB", (W, H), "#000000")
@@ -63,12 +104,10 @@ def create_design():
     if os.path.exists(IMG_1):
         img = Image.open(IMG_1).convert("RGB")
 
-        # Fill WIDTH always → prevents black bars
         ratio = W / img.width
         new_h = int(img.height * ratio)
         img = img.resize((W, new_h), Image.Resampling.LANCZOS)
 
-        # Center crop vertically
         if new_h > H:
             top = (new_h - H) // 2
             img = img.crop((0, top, W, top + H))
@@ -105,7 +144,7 @@ def create_design():
     # ---------- HEADLINE AUTO SIZE ----------
     HL_SIZE = 88
     while True:
-        hl_font = ImageFont.truetype(FONT_BOLD, HL_SIZE)
+        hl_font = safe_font(FONT_BOLD, HL_SIZE)
         lines = wrap_text(draw, headline, hl_font, TEXT_WIDTH)
         if len(lines) <= 4 or HL_SIZE <= 72:
             break
@@ -114,7 +153,7 @@ def create_design():
     # ---------- SUMMARY SIZE (BIGGER) ----------
     SM_SIZE = int(HL_SIZE * 0.48)
     SM_SIZE = max(36, min(48, SM_SIZE))
-    sm_font = ImageFont.truetype(FONT_REGULAR, SM_SIZE)
+    sm_font = safe_font(FONT_REGULAR, SM_SIZE)
 
     hl_lines = wrap_text(draw, headline, hl_font, TEXT_WIDTH)
     sm_lines = wrap_text(draw, summary, sm_font, TEXT_WIDTH)
@@ -135,7 +174,7 @@ def create_design():
         radius=6, fill="#D10024"
     )
 
-    badge_font = ImageFont.truetype(FONT_BOLD, 32)
+    badge_font = safe_font(FONT_BOLD, 32)
     draw_shadow(draw, (SAFE_LEFT + 18, badge_y + 8), "BREAKING NEWS", badge_font, "white", offset=1)
 
     # ---------- HEADLINE ----------
@@ -151,7 +190,7 @@ def create_design():
         y += sm_h
 
     # ---------- WATERMARK ----------
-    wm_font = ImageFont.truetype(FONT_BOLD, 30)
+    wm_font = safe_font(FONT_BOLD, 30)
     draw.text((W - 260, 50), "@IPLTrackX", font=wm_font, fill=(255, 255, 255, 110))
 
     # ---------- INSTAGRAM SHARPEN ----------
@@ -164,3 +203,4 @@ def create_design():
 
 if __name__ == "__main__":
     create_design()
+
