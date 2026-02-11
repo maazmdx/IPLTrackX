@@ -88,4 +88,104 @@ def create_design():
     canvas = Image.new("RGB", (W,H), "#000000")
 
     # ---------------- IMAGE (NO BLACK BARS EVER)
-    if os.path.exists(IMG_1):_
+    if os.path.exists(IMG_1):
+        img = Image.open(IMG_1).convert("RGB")
+        ratio = W / img.width
+        nh = int(img.height * ratio)
+        img = img.resize((W, nh), Image.Resampling.LANCZOS)
+
+        if nh > H:
+            top = int((nh - H) * 0.35)
+            img = img.crop((0, top, W, top + H))
+
+        canvas.paste(img, (0,0))
+
+    # ---------------- STRONG TEXT BACKGROUND
+    b = brightness(canvas)
+    overlay = Image.new("RGBA", (W,H), (0,0,0,0))
+    d = ImageDraw.Draw(overlay)
+
+    base = int(200 + (b/255)*40)
+    for y in range(int(H*0.40), H):
+        a = int(base * ((y-H*0.40)/(H*0.60)))
+        d.line([(0,y),(W,y)], fill=(0,0,0,a))
+
+    canvas.paste(overlay, (0,0), overlay)
+
+    draw = ImageDraw.Draw(canvas)
+
+    # ---------------- LOAD DATA
+    with open(NEWS_DATA) as f:
+        data = json.load(f)
+
+    headline = data.get("title","BREAKING NEWS").upper()
+    summary  = data.get("summary","")
+
+    if len(headline.split()) <= 2:
+        headline += " MATCH WIN"
+
+    SAFE_LEFT = 70
+    SAFE_BOTTOM = H - 110
+    TEXT_W = int(W*0.50)
+
+    # ---------------- HEADLINE (BIG BUT CONTROLLED)
+    HL = 96
+    while HL >= 72:
+        hfont = safe_font(FONT_BOLD, HL)
+        hlines = wrap(draw, headline, hfont, TEXT_W)
+        if len(hlines) <= 4:
+            break
+        HL -= 2
+
+    # ---------------- SUMMARY (BIG & READABLE)
+    SM = int(HL * 0.65)
+    SM = max(44, min(56, SM))
+    sfont = safe_font(FONT_REGULAR, SM)
+
+    hlines = wrap(draw, headline, hfont, TEXT_W)
+    slines = wrap(draw, summary, sfont, TEXT_W)
+
+    hh = int(HL*1.05)
+    sh = int(SM*1.30)
+
+    total_h = len(hlines)*hh + len(slines)*sh + 90
+
+    sy = SAFE_BOTTOM - len(slines)*sh
+    hy = sy - 30 - len(hlines)*hh
+    by = hy - 75
+
+    # ---------------- BREAKING BADGE
+    draw.rounded_rectangle(
+        [(SAFE_LEFT, by),(SAFE_LEFT+300, by+58)],
+        radius=8, fill="#D10024"
+    )
+    shadow(draw, (SAFE_LEFT+18, by+10), "BREAKING NEWS",
+           safe_font(FONT_BOLD, 34), "white", off=2)
+
+    # ---------------- HEADLINE DRAW
+    y = hy
+    for l in hlines:
+        shadow(draw, (SAFE_LEFT, y), l, hfont, "white", off=5)
+        y += hh
+
+    # ---------------- SUMMARY DRAW (CLEAR!)
+    y = sy
+    for l in slines:
+        shadow(draw, (SAFE_LEFT, y), l, sfont, "#FFFFFF", off=3)
+        y += sh
+
+    # ---------------- WATERMARK
+    draw.text((W-260, 45), "@IPLTrackX",
+              font=safe_font(FONT_BOLD, 32),
+              fill=(255,255,255,140))
+
+    # ---------------- INSTAGRAM FINISH
+    canvas = ImageEnhance.Contrast(canvas).enhance(1.10)
+    canvas = canvas.filter(ImageFilter.UnsharpMask(radius=1.4, percent=130, threshold=3))
+
+    canvas.save(FINAL_IMAGE, "JPEG", quality=95, subsampling=0, optimize=True)
+    print("✅ FINAL POST SAVED")
+
+# =========================================================
+if __name__ == "__main__":
+    create_design()
