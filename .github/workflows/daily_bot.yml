@@ -2,8 +2,8 @@ name: IPLTrackX Auto-Bot
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Runs every hour (at minute 0)
-  workflow_dispatch:      # Allows you to click "Run Now" manually for testing
+    - cron: '0 * * * *'  # Runs every hour
+  workflow_dispatch:      # Allows manual trigger
 
 jobs:
   run-bot:
@@ -22,22 +22,40 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Create Auth Files (Inject Secrets)
-        # This takes your Keys from GitHub Secrets and creates the files needed
+      - name: Create Auth Files (The Bulletproof Method)
+        env:
+          TOKEN_DATA: ${{ secrets.TOKEN_JSON }}
+          CRED_DATA: ${{ secrets.CREDENTIALS_JSON }}
         run: |
-          echo '${{ secrets.TOKEN_JSON }}' > token.json
-          echo '${{ secrets.CREDENTIALS_JSON }}' > credentials.json
+          import os
+          
+          # Write Token
+          token_content = os.environ.get("TOKEN_DATA", "")
+          if token_content:
+              with open("token.json", "w") as f:
+                  f.write(token_content)
+              print("✅ token.json created.")
+          else:
+              print("❌ Error: TOKEN_JSON secret is empty!")
+
+          # Write Credentials
+          cred_content = os.environ.get("CRED_DATA", "")
+          if cred_content:
+              with open("credentials.json", "w") as f:
+                  f.write(cred_content)
+              print("✅ credentials.json created.")
+          else:
+              print("❌ Error: CREDENTIALS_JSON secret is empty!")
+        shell: python
 
       - name: Run The Bot
         env:
-          # We pass the keys as Environment Variables
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
         run: |
           python control/main.py
 
-      - name: Keep History Alive (Commit Changes)
-        # This saves the history.txt so the bot remembers what it posted
+      - name: Keep History Alive
         run: |
           git config --global user.name "IPLBot"
           git config --global user.email "bot@ipltrackx.com"
