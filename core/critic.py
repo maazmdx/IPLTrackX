@@ -10,7 +10,9 @@ API_KEY = "AIzaSyBMsDM7M8BxmrS216fcMIYz68iwS74ZFws"
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 NEWS_DATA_FILE = os.path.join(DATA_DIR, "design_data.json")
-CAPTION_FILE = os.path.join(BASE_DIR, "final_caption.txt")
+
+# ✅ FIX: Save to data/caption.txt so publisher.py can find it
+CAPTION_FILE = os.path.join(DATA_DIR, "caption.txt")
 
 def clean_markdown(text):
     return text.replace('**', '').replace('__', '').strip()
@@ -21,7 +23,7 @@ def generate_caption_ai(data):
         
         # SMART LADDER: Try the best model first
         model = None
-        candidates = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-pro"]
+        candidates = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"]
         
         for name in candidates:
             try:
@@ -63,12 +65,20 @@ def run_critic():
     with open(NEWS_DATA_FILE, 'r') as f: data = json.load(f)
 
     print("📝 CRITIC: Generating Social Caption...")
+    # Clean the title for safety
+    if 'title' in data:
+        data['title'] = clean_markdown(data['title'])
+
     caption = generate_caption_ai(data)
     
+    # Ensure data directory exists
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+        
     with open(CAPTION_FILE, 'w') as f:
         f.write(caption)
         
-    print("📝 CRITIC: Caption Saved Successfully.")
+    print(f"📝 CRITIC: Caption Saved Successfully to {CAPTION_FILE}")
     return True
 
 if __name__ == "__main__":
