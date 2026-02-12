@@ -3,14 +3,20 @@ import json
 import hashlib
 from datetime import datetime
 
+# ================= PATHS =================
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-TEMP_DIR = os.path.join(BASE_DIR, "temp")
 
 NEWS_DATA_FILE = os.path.join(DATA_DIR, "design_data.json")
-POST_LOG_FILE = os.path.join(DATA_DIR, "posted.json")
 
-FINAL_IMAGE = os.path.join(TEMP_DIR, "news_image.jpg")
+# Your system saves image here (from artist log)
+FINAL_IMAGE = os.path.join(BASE_DIR, "final_post.jpg")
+
+# Your critic saves caption here
+CAPTION_FILE = os.path.join(DATA_DIR, "caption.txt")
+
+# Spam lock file
+POST_LOG_FILE = os.path.join(DATA_DIR, "posted.json")
 
 
 # ================= HASH GENERATOR =================
@@ -52,20 +58,32 @@ def run_publisher():
 
     print("🚀 Publisher: Preparing post...")
 
-    # Check news data
-    if not os.path.exists(NEWS_DATA_FILE):
-        print("❌ No design data found.")
+    # ---------------- IMAGE CHECK ----------------
+    if not os.path.exists(FINAL_IMAGE):
+        print("❌ Image not found:", FINAL_IMAGE)
         return False
 
-    with open(NEWS_DATA_FILE, "r") as f:
-        data = json.load(f)
-
-    caption = data.get("summary", "").strip()
-    title = data.get("title", "").strip()
-
-    if not caption or not os.path.exists(FINAL_IMAGE):
-        print("❌ Missing caption or image.")
+    # ---------------- CAPTION CHECK ----------------
+    if not os.path.exists(CAPTION_FILE):
+        print("❌ Caption file not found:", CAPTION_FILE)
         return False
+
+    with open(CAPTION_FILE, "r") as f:
+        caption = f.read().strip()
+
+    if not caption:
+        print("❌ Caption empty.")
+        return False
+
+    # ---------------- LOAD TITLE ----------------
+    title = ""
+    if os.path.exists(NEWS_DATA_FILE):
+        try:
+            with open(NEWS_DATA_FILE, "r") as f:
+                data = json.load(f)
+                title = data.get("title", "")
+        except:
+            pass
 
     # ================= SPAM CHECK =================
     post_hash = generate_post_hash(FINAL_IMAGE, caption)
