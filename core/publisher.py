@@ -1,81 +1,99 @@
 import os
-import sys
-import time
-import socket
+import json
+import hashlib
 from datetime import datetime
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
-from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
-
-# --- CONFIGURATION ---
-socket.setdefaulttimeout(600)
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+DATA_DIR = os.path.join(BASE_DIR, "data")
 TEMP_DIR = os.path.join(BASE_DIR, "temp")
-FINAL_IMAGE = os.path.join(BASE_DIR, "final_post.jpg")
-FINAL_CAPTION = os.path.join(BASE_DIR, "final_caption.txt")
 
-# AUTH FILES
-TOKEN_FILE = os.path.join(BASE_DIR, "token.json")
-CREDENTIALS_FILE = os.path.join(BASE_DIR, "credentials.json")
+NEWS_DATA_FILE = os.path.join(DATA_DIR, "design_data.json")
+POST_LOG_FILE = os.path.join(DATA_DIR, "posted.json")
 
-# 🔴 YOUR MAIN FOLDER ID (Do not change this) 🔴
-MAIN_FOLDER_ID = "1R-wX0mAaYbZHoygVmnX97ttPiZwt156Z"
+FINAL_IMAGE = os.path.join(TEMP_DIR, "news_image.jpg")
 
-def authenticate_drive():
-    creds = None
-    if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, ['https://www.googleapis.com/auth/drive.file'])
-    if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-    return build('drive', 'v3', credentials=creds)
 
-def upload_to_drive():
-    print(f"🔍 PUBLISHER: Preparing Upload to Main Folder...")
-    
-    if not os.path.exists(FINAL_IMAGE):
-        print("❌ Publisher Error: Final image not found.")
-        return True 
+# ================= HASH GENERATOR =================
+def generate_post_hash(image_path, caption):
+    h = hashlib.sha256()
 
-    for attempt in range(1, 4):
-        try:
-            print(f"--- ☁️ CLOUD UPLOADER (Attempt {attempt}/3) ---")
-            service = authenticate_drive()
-            if not service: return False
+    if os.path.exists(image_path):
+        with open(image_path, "rb") as f:
+            h.update(f.read())
 
-            # Generate Timestamp
-            date_str = datetime.now().strftime("%d-%b")
-            time_str = datetime.now().strftime("%H-%M")
-            
-            # 1. Upload IMAGE
-            img_name = f"{date_str}_Post-{time_str}.jpg"
-            media_img = MediaFileUpload(FINAL_IMAGE, mimetype='image/jpeg', resumable=True)
-            service.files().create(
-                body={'name': img_name, 'parents': [MAIN_FOLDER_ID]}, 
-                media_body=media_img
-            ).execute()
-            print(f"✅ Image Uploaded: {img_name}")
+    h.update(caption.encode())
+    return h.hexdigest()
 
-            # 2. Upload CAPTION
-            if os.path.exists(FINAL_CAPTION):
-                txt_name = f"{date_str}_Caption-{time_str}.txt"
-                media_txt = MediaFileUpload(FINAL_CAPTION, mimetype='text/plain', resumable=True)
-                service.files().create(
-                    body={'name': txt_name, 'parents': [MAIN_FOLDER_ID]}, 
-                    media_body=media_txt
-                ).execute()
-                print(f"✅ Caption Uploaded: {txt_name}")
-            
-            return True
 
-        except Exception as e:
-            if "storageQuotaExceeded" in str(e): return True 
-            print(f"⚠️ Upload Failed: {e}")
-            time.sleep(10)
+# ================= LOAD POST HISTORY =================
+def load_post_history():
+    if not os.path.exists(POST_LOG_FILE):
+        return set()
 
-    return False
+    try:
+        with open(POST_LOG_FILE, "r") as f:
+            data = json.load(f)
+            return set(data)
+    except:
+        return set()
 
+
+# ================= SAVE POST HISTORY =================
+def save_post_history(post_hash):
+    history = load_post_history()
+    history.add(post_hash)
+
+    with open(POST_LOG_FILE, "w") as f:
+        json.dump(list(history), f, indent=4)
+
+
+# ================= MAIN PUBLISHER =================
+def run_publisher():
+
+    print("🚀 Publisher: Preparing post...")
+
+    # Check news data
+    if not os.path.exists(NEWS_DATA_FILE):
+        print("❌ No design data found.")
+        return False
+
+    with open(NEWS_DATA_FILE, "r") as f:
+        data = json.load(f)
+
+    caption = data.get("summary", "").strip()
+    title = data.get("title", "").strip()
+
+    if not caption or not os.path.exists(FINAL_IMAGE):
+        print("❌ Missing caption or image.")
+        return False
+
+    # ================= SPAM CHECK =================
+    post_hash = generate_post_hash(FINAL_IMAGE, caption)
+    history = load_post_history()
+
+    if post_hash in history:
+        print("⚠️ DUPLICATE POST BLOCKED (Spam Protection)")
+        return False
+
+    # ================= SAVE OUTPUT FOR MAKE =================
+    output = {
+        "image": FINAL_IMAGE,
+        "caption": caption,
+        "title": title,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+    out_file = os.path.join(DATA_DIR, "final_post.json")
+    with open(out_file, "w") as f:
+        json.dump(output, f, indent=4)
+
+    # ================= LOCK THIS POST =================
+    save_post_history(post_hash)
+
+    print("✅ Publisher: Post Ready & Locked (No Spam)")
+    return True
+
+
+# ================= ENTRY =================
 if __name__ == "__main__":
-    if upload_to_drive(): sys.exit(0)
-    else: sys.exit(1)
+    run_publisher()

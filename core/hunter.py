@@ -39,7 +39,7 @@ REJECT_WORDS = ["u19", "under-19", "women", "a team", "academy", "emerging"]
 IMPORTANT_WORDS = [
     "win", "beat", "defeat", "thriller", "century",
     "record", "final", "knockout", "eliminated",
-    "champion", "historic", "series", "title", "victory"
+    "champion", "historic", "series", "title"
 ]
 
 # -------- RSS SOURCES --------
@@ -50,12 +50,13 @@ RSS_FEEDS = [
     "https://timesofindia.indiatimes.com/rssfeeds/54829575.cms"
 ]
 
+
 # ================= HELPERS =================
 
 def normalize(text):
     if not text:
         return ""
-    return re.sub(r'[^a-z0-9]', '', text.lower())
+    return re.sub(r'[^a-z0-9]', '', text.lower().strip())
 
 
 def clean_summary(text):
@@ -92,6 +93,23 @@ def entry_time(e):
     return datetime.min
 
 
+# ================= DUPLICATE GUARD =================
+
+def is_duplicate(title, url, posted_set):
+    n_title = normalize(title)
+    n_url = normalize(url)
+
+    for old in posted_set:
+        # Exact match
+        if n_title == old or n_url == old:
+            return True
+
+        # Fuzzy protection (prevents slightly changed same news)
+        if n_title[:60] in old or old[:60] in n_title:
+            return True
+    return False
+
+
 # ================= MAIN HUNTER =================
 
 def search_news_text():
@@ -100,9 +118,8 @@ def search_news_text():
     if not os.path.exists(HISTORY_FILE):
         open(HISTORY_FILE, 'w').close()
 
-    # Load normalized history
     with open(HISTORY_FILE, 'r') as f:
-        posted_set = set(line.strip() for line in f.readlines())
+        posted_set = set(normalize(line) for line in f.read().splitlines())
 
     for url in RSS_FEEDS:
         print(f"   📡 Scanning: {url[:40]}...")
@@ -112,27 +129,17 @@ def search_news_text():
 
         entries = sorted(feed.entries, key=entry_time, reverse=True)
 
-        for entry in entries[:20]:
+        for entry in entries[:25]:
             title = entry.title.strip()
-            link = entry.link.strip()
 
             if len(title) < 12:
                 continue
 
-            norm_title = normalize(title)
-            norm_link = normalize(link)
-
-            # -------- HARD DUPLICATE BLOCK --------
-            if norm_title in posted_set or norm_link in posted_set:
+            # DUPLICATE CHECK (Spam-Proof)
+            if is_duplicate(title, entry.link, posted_set):
                 continue
 
-            # -------- SOFT DUPLICATE BLOCK --------
-            # Prevent near-same headline repost
-            for old in posted_set:
-                if len(old) > 25 and old[:25] == norm_title[:25]:
-                    continue
-
-            # -------- TIME FILTER --------
+            # Time check (last 18 hours only)
             if not hasattr(entry, "published_parsed") or not entry.published_parsed:
                 continue
 
@@ -140,19 +147,19 @@ def search_news_text():
             if datetime.now() - pub_time > timedelta(hours=18):
                 continue
 
-            # -------- TRASH FILTER --------
+            # Trash filter
             if any(word in title.lower() for word in BLOCK_WORDS):
                 continue
 
-            # -------- TEAM WHITELIST --------
+            # Team filter
             if not is_top_match(title):
                 continue
 
-            # -------- IMPORTANCE FILTER --------
+            # Importance filter
             if not is_important(title):
                 continue
 
-            # -------- SUMMARY CLEAN --------
+            # Clean summary
             raw_summary = entry.get('summary') or entry.get('description') or ""
             summary = clean_summary(raw_summary)
             if len(summary) < 40:
@@ -162,7 +169,7 @@ def search_news_text():
             news_data = {
                 "title": title,
                 "summary": summary,
-                "url": link,
+                "url": entry.link,
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
 
@@ -172,10 +179,9 @@ def search_news_text():
             with open(NEWS_DATA_FILE, 'w') as f:
                 json.dump(news_data, f, indent=4)
 
-            # Save normalized fingerprint ONLY
+            # 🔒 SAVE BOTH TITLE + URL (Hard Lock)
             with open(HISTORY_FILE, 'a') as f:
-                f.write(norm_title + "\n")
-                f.write(norm_link + "\n")
+                f.write(title + " | " + entry.link + "\n")
 
             print(f"   ✔ ACCEPTED: {title[:70]}...")
             return True
