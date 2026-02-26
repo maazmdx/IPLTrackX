@@ -42,6 +42,11 @@ IMPORTANT_WORDS = [
     "champion", "historic", "series", "title"
 ]
 
+MEDIUM_WORDS = [
+    "injury", "comeback", "return", "captain", "selection", "suspension",
+    "update", "controversy", "statement", "transfer", "trade"
+]
+
 # -------- RSS SOURCES --------
 RSS_FEEDS = [
     "https://www.espncricinfo.com/rss/content/story/feeds/0.xml",
@@ -76,6 +81,15 @@ def is_top_match(title):
 def is_important(title):
     t = title.lower()
     return any(w in t for w in IMPORTANT_WORDS)
+
+
+def get_priority(title):
+    t = title.lower()
+    if any(w in t for w in IMPORTANT_WORDS):
+        return "HIGH"
+    if any(w in t for w in MEDIUM_WORDS):
+        return "MEDIUM"
+    return "LOW"
 
 
 def fetch_feed_safely(url):
@@ -113,7 +127,7 @@ def is_duplicate(title, url, posted_set):
 # ================= MAIN HUNTER =================
 
 def search_news_text():
-    print("🦅 THE HUNTER: Scanning for BIG News Only...")
+    print("🦅 THE HUNTER: Scanning for HIGH/MEDIUM priority cricket news...")
 
     if not os.path.exists(HISTORY_FILE):
         open(HISTORY_FILE, 'w').close()
@@ -155,8 +169,9 @@ def search_news_text():
             if not is_top_match(title):
                 continue
 
-            # Importance filter
-            if not is_important(title):
+            # Importance filter (allow medium-priority news too)
+            priority = get_priority(title)
+            if priority == "LOW":
                 continue
 
             # Clean summary
@@ -170,6 +185,8 @@ def search_news_text():
                 "title": title,
                 "summary": summary,
                 "url": entry.link,
+                "priority": priority,
+                "content_type": "news",
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
 
@@ -186,7 +203,7 @@ def search_news_text():
             print(f"   ✔ ACCEPTED: {title[:70]}...")
             return True
 
-    print("❌ No VIP news found.")
+    print("❌ No high/medium priority news found.")
     return False
 
 
