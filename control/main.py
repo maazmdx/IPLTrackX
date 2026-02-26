@@ -36,9 +36,14 @@ def run_pipeline():
 
     # ---------- HUNTER ----------
     log_event("PIPELINE", "Step 1: Hunting News...")
-    if not run_module("core.hunter"):
-        log_event("SYSTEM", "🛑 No news → EXIT FAST (Sleep)")
-        return False
+    hunter_ok = run_module("core.hunter")
+    if hunter_ok:
+        log_event("PIPELINE", "Hunter found usable news content.")
+    else:
+        log_event("PIPELINE", "No VIP/priority news. Switching to fallback content engines...")
+        if not run_module("core.fallback_pipeline"):
+            log_error("E01", "Fallback", "All fallback engines failed to produce content.")
+            return False
 
     # ---------- BRAIN ----------
     log_event("PIPELINE", "Step 2: Brain...")
